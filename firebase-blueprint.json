@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Income or expense record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of transaction" },
+        "amount": { "type": "number", "description": "Amount in THB" },
+        "category": { "type": "string", "maxLength": 50, "description": "Category name" },
+        "note": { "type": "string", "maxLength": 200, "description": "Optional note" },
+        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "YYYY-MM-DD date" },
+        "month": { "type": "string", "pattern": "^\\d{4}-\\d{2}$", "description": "YYYY-MM month" },
+        "paymentMethod": { "type": "string", "maxLength": 50, "description": "Payment method" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "category", "date", "month", "createdAt"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Monthly budget limit per user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "month": { "type": "string", "pattern": "^\\d{4}-\\d{2}$", "description": "YYYY-MM" },
+        "monthlyLimit": { "type": "number", "description": "Total monthly spending budget" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "month", "monthlyLimit", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "User income and expense transactions"
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/Budget" },
+      "description": "User monthly budget limits"
+    }
+  }
+}

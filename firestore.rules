@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /test/connection {
+      allow get: if true;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTransaction(data, userId) {
+      return data.userId == userId
+        && data.userId == request.auth.uid
+        && (data.type == 'income' || data.type == 'expense')
+        && data.amount is number
+        && data.amount > 0
+        && data.category is string
+        && data.category.size() > 0
+        && data.category.size() <= 50
+        && data.date is string
+        && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.month is string
+        && data.month.matches('^\\d{4}-\\d{2}$')
+        && (!('note' in data) || (data.note is string && data.note.size() <= 200))
+        && (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 50));
+    }
+
+    function isValidBudget(data, userId) {
+      return data.userId == userId
+        && data.userId == request.auth.uid
+        && data.month is string
+        && data.month.matches('^\\d{4}-\\d{2}$')
+        && data.monthlyLimit is number
+        && data.monthlyLimit >= 0;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+
+      match /transactions/{transactionId} {
+        allow get: if isOwner(userId) && isValidId(transactionId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(transactionId)
+          && isValidTransaction(incoming(), userId)
+          && incoming().createdAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(transactionId)
+          && isValidTransaction(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'category', 'note', 'date', 'month', 'paymentMethod', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(transactionId);
+      }
+
+      match /budgets/{budgetId} {
+        allow get: if isOwner(userId) && isValidId(budgetId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(budgetId)
+          && isValidBudget(incoming(), userId)
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(budgetId)
+          && isValidBudget(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['monthlyLimit', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(budgetId);
+      }
+    }
+  }
+}
